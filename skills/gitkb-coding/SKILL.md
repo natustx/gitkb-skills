@@ -4,7 +4,9 @@ description: >-
   Use GitKB during active coding: implement features, fix bugs, investigate code,
   understand files or symbols, and refactor safely with code intelligence. Use
   when changing code, debugging, exploring where behavior lives, checking callers,
-  assessing impact, or updating tasks with implementation evidence.
+  assessing impact, or updating tasks with implementation evidence. Supports
+  subcommands: help, explore, understand, implement, debug, refactor-check,
+  verify, evidence.
 allowed-tools:
   - Bash(git kb:*)
   - Bash(git:*)
@@ -25,10 +27,31 @@ allowed-tools:
 
 Use this skill for active development. Follow `gitkb-core` for GitKB mechanics and `gitkb-task-workflow` for task lifecycle updates.
 
-## Development workflow
+## Subcommand dispatcher
+
+When this skill is invoked, first identify a subcommand from the user's request.
+
+If no subcommand is specified or intent is ambiguous, list these subcommands and ask the user to choose one:
+
+| Subcommand | Use when |
+|---|---|
+| `help` | Explain coding operations. |
+| `explore` | Find where behavior or concepts live. |
+| `understand` | Deep-dive a file or symbol. |
+| `implement` | Make a feature or bug-fix change tied to a task/incident. |
+| `debug` | Investigate a failing behavior or error. |
+| `refactor-check` | Check callers/callees/impact before risky changes. |
+| `verify` | Run tests/build/checks before claiming completion. |
+| `evidence` | Update GitKB task/incident with implementation evidence. |
+
+Example prompt when missing: “Which coding subcommand should I run: explore, understand, implement, debug, refactor-check, verify, or evidence?”
+
+## Shared development workflow
+
+For `implement`, `debug`, and substantial `refactor-check` follow this sequence:
 
 1. Ensure non-trivial work has a GitKB task or incident.
-   - If missing, use `gitkb-task-workflow` create mode before editing.
+   - If missing, use `gitkb-task-workflow create` before editing.
 2. Load current project/task context.
 3. Understand the relevant code with code intelligence before editing.
 4. Make the code change.
@@ -55,23 +78,34 @@ git kb code index <path>
 
 If a command shape differs, run `git kb code --help` or the subcommand help and adapt.
 
-## Explore mode: “where is X?”
+## Subcommands
+
+### `explore`
+
+Use for “where is X?” or “how is Y implemented?”
 
 1. Search symbols first:
    ```bash
    git kb code symbols "<query>"
    ```
-2. Search docs/tasks for related context:
+2. For promising symbols, inspect connections:
+   ```bash
+   git kb code callers <symbol>
+   git kb code callees <symbol>
+   ```
+3. Search docs/tasks for related context:
    ```bash
    git kb search "<query>"
    ```
-3. Use semantic search when exact names are unknown and embeddings are available:
+4. Use semantic search when exact names are unknown and embeddings are available:
    ```bash
    git kb ai semantic "<query>"
    ```
-4. Summarize likely files/symbols and suggested next step.
+5. Summarize code matches, document matches, and suggested next steps.
 
-## Understand mode: file or symbol deep dive
+### `understand`
+
+Use for a file or symbol deep dive.
 
 For a file:
 
@@ -95,7 +129,27 @@ Output:
 - related KB docs
 - implications for the requested change
 
-## Refactor safety mode
+### `implement`
+
+1. Ensure a relevant task/incident exists.
+2. Use `explore` or `understand` as needed.
+3. Read relevant files directly after identifying them.
+4. Make the smallest cohesive change that satisfies the task.
+5. Update tests alongside production code when behavior changes.
+6. Avoid broad refactors unless the task calls for them.
+7. If new bugs or scope appear, add them to the current task or create/link a new incident/task.
+8. Run `verify` and then `evidence`.
+
+### `debug`
+
+1. Capture exact symptoms, commands, errors, and expected vs actual behavior.
+2. Search logs/errors with normal text search when appropriate.
+3. Use `explore`/`understand` to find likely code paths.
+4. Form a hypothesis before changing code.
+5. Make a minimal fix.
+6. Run `verify` and document findings with `evidence`.
+
+### `refactor-check`
 
 Before changing a signature, renaming a public symbol, modifying type/interface fields, deleting code, or changing a file’s public API:
 
@@ -104,6 +158,7 @@ git kb code symbols "<symbol-name>"
 git kb code callers <resolved-symbol>
 git kb code callees <resolved-symbol>
 git kb code impact <file>
+git kb code refs <resolved-symbol>
 ```
 
 Risk guide:
@@ -112,17 +167,9 @@ Risk guide:
 - **Medium**: 3-10 callers or multiple modules. Plan call-site updates and run tests.
 - **High**: 10+ callers or public API. Confirm with the user before proceeding.
 
-Report the files that need updates before editing.
+Report direct callers, transitive impact, callees, related documents, risk level, and the files that need updates before editing.
 
-## Implementation mode
-
-1. Read relevant files directly after identifying them.
-2. Make the smallest cohesive change that satisfies the task.
-3. Update tests alongside production code when behavior changes.
-4. Avoid broad refactors unless the task calls for them.
-5. If new bugs or scope appear, add them to the current task or create/link a new incident/task.
-
-## Verification
+### `verify`
 
 Before claiming work is done, run relevant checks. Choose from project conventions:
 
@@ -140,7 +187,7 @@ pytest
 
 If verification cannot be run, state why and what should be run next.
 
-## Updating GitKB after coding
+### `evidence`
 
 Add progress or completion evidence to the task/incident:
 
